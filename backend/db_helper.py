@@ -2,6 +2,9 @@ import os
 from dotenv import load_dotenv
 from contextlib import contextmanager
 import mysql.connector
+from logging_setup import setup_logger
+
+logger = setup_logger("db_helper")
 
 # Load environment variables
 load_dotenv()
@@ -22,6 +25,9 @@ try:
 except Exception as e:
     print(f"Error loading environment variables: {e}")
     raise
+
+
+
 
 @contextmanager
 def get_db_cursor(commit=False):
@@ -68,6 +74,7 @@ def fetch_all_records():
         return None
 
 def fetch_expenses_for_date(expense_date):
+    logger.info(f"fetch_expenses_for_date called with {expense_date}")
     try:
         with get_db_cursor() as cursor:
             cursor.execute("SELECT * FROM expenses WHERE expense_date = %s", (expense_date,))
@@ -81,6 +88,7 @@ def fetch_expenses_for_date(expense_date):
         return None
 
 def insert_expense(expense_date, amount, category, notes):
+    logger.info(f"insert_expenses called with date:{expense_date}, amount:{amount}, category:{category}, notes:{notes}")
     try:
         with get_db_cursor(commit=True) as cursor:
             cursor.execute(
@@ -91,6 +99,7 @@ def insert_expense(expense_date, amount, category, notes):
         print(f"Error inserting expense: {e}")
 
 def delete_expenses_for_date(expense_date):
+    logger.info(f"delete_expenses_for_date called with {expense_date}")
     try:
         with get_db_cursor(commit=True) as cursor:
             cursor.execute("DELETE FROM expenses WHERE expense_date = %s", (expense_date,))
@@ -98,6 +107,7 @@ def delete_expenses_for_date(expense_date):
         print(f"Error deleting expenses for date {expense_date}: {e}")
         
 def fetch_expense_summary(start_date, end_date):
+    logger.info(f"fetch_expense_summary called with start: {start_date}, end: {end_date}")
     try:
         with get_db_cursor() as cursor:
             cursor.execute('''SELECT category, SUM(amount) as total
@@ -111,8 +121,8 @@ def fetch_expense_summary(start_date, end_date):
 
 if __name__ == "__main__":
     # Example function calls:
-    fetch_all_records()
-    # fetch_expenses_for_date("2024-08-01")
+    #fetch_all_records()
+    fetch_expenses_for_date("2024-08-02")
     # insert_expense("2024-08-24", 30, "Food", "Pizza")
     # delete_expenses_for_date("2024-08-20")
     # fetch_expenses_for_date("2024-08-24")
