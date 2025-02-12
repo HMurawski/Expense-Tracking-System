@@ -9,25 +9,22 @@ logger = setup_logger("db_helper")
 # Load environment variables
 load_dotenv()
 
+def get_env_variable(var_name):
+    value = os.getenv(var_name)
+    if value is None:
+        raise ValueError(f"Missing required environment variable: {var_name}")
+    return value
+
 # Retrieve and validate environment variables
 try:
-    host = os.getenv("DB_HOST")
-    port = int(os.getenv("DB_PORT"))  # Casting to int as mysql.connector expects an integer
-    user = os.getenv("DB_USER")
-    password = os.getenv("DB_PASSWORD")
-    database = os.getenv("DB_NAME")
-
-    if None in [host, port, user, password, database]:
-        raise ValueError(
-            "Missing required environment variables! Ensure that your .env file contains: "
-            "DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME."
-        )
-except Exception as e:
-    print(f"Error loading environment variables: {e}")
+    host = get_env_variable("DB_HOST")
+    port = int(get_env_variable("DB_PORT"))
+    user = get_env_variable("DB_USER")
+    password = get_env_variable("DB_PASSWORD")
+    database = get_env_variable("DB_NAME")
+except ValueError as e:
+    logger.error(str(e))
     raise
-
-
-
 
 @contextmanager
 def get_db_cursor(commit=False):
@@ -41,83 +38,84 @@ def get_db_cursor(commit=False):
             database=database
         )
         cursor = connection.cursor(dictionary=True)
-        try:
-            yield cursor
-            if commit:
-                connection.commit()
-        except Exception as e:
-            if commit:
-                connection.rollback()
-            print(f"Error during database operation: {e}")
-            raise
-        finally:
-            print("Closing cursor")
-            cursor.close()
+        yield cursor
+        if commit:
+            connection.commit()
     except mysql.connector.Error as err:
-        print(f"Database connection error: {err}")
+        logger.error(f"Database connection error: {err}")
+        if commit:
+            connection.rollback()
         raise
     finally:
+        if cursor:
+            cursor.close()
         if connection:
             connection.close()
 
+
 def fetch_all_records():
+    """Fetch all records from the expenses table."""
     query = "SELECT * FROM expenses"
     try:
         with get_db_cursor() as cursor:
             cursor.execute(query)
-            expenses = cursor.fetchall()
-            for expense in expenses:
-                print(expense)
-            return expenses
+            return cursor.fetchall()
     except Exception as e:
-        print(f"Error fetching records: {e}")
-        return None
+        logger.error(f"Error fetching records: {e}")
+        return []
 
 def fetch_expenses_for_date(expense_date):
-    logger.info(f"fetch_expenses_for_date called with {expense_date}")
+    """Fetch expenses for a specific date."""
+    logger.info(f"Fetching expenses for {expense_date}")
+    query = "SELECT * FROM expenses WHERE expense_date = %s"
     try:
         with get_db_cursor() as cursor:
-            cursor.execute("SELECT * FROM expenses WHERE expense_date = %s", (expense_date,))
-            expenses = cursor.fetchall()
-            for expense in expenses:
-                print(expense)
-            # Return the list of expenses so that tests can use the result
-            return expenses
+            cursor.execute(query, (expense_date,))
+            return cursor.fetchall()
     except Exception as e:
-        print(f"Error fetching expenses for date {expense_date}: {e}")
-        return None
+        logger.error(f"Error fetching expenses for date {expense_date}: {e}")
+        return []
 
 def insert_expense(expense_date, amount, category, notes):
-    logger.info(f"insert_expenses called with date:{expense_date}, amount:{amount}, category:{category}, notes:{notes}")
+    """Insert a new expense."""
+    logger.info(f"Inserting expense: {expense_date}, {amount}, {category}, {notes}")
+    query = """
+        INSERT INTO expenses (expense_date, amount, category, notes)
+        VALUES (%s, %s, %s, %s)
+    """
     try:
         with get_db_cursor(commit=True) as cursor:
-            cursor.execute(
-                "INSERT INTO expenses (expense_date, amount, category, notes) VALUES (%s, %s, %s, %s)",
-                (expense_date, amount, category, notes)
-            )
+            cursor.execute(query, (expense_date, amount, category, notes))
     except Exception as e:
-        print(f"Error inserting expense: {e}")
+        logger.error(f"Error inserting expense: {e}")
 
 def delete_expenses_for_date(expense_date):
-    logger.info(f"delete_expenses_for_date called with {expense_date}")
+    """Delete all expenses for a specific date."""
+    logger.info(f"Deleting expenses for {expense_date}")
+    query = "DELETE FROM expenses WHERE expense_date = %s"
     try:
         with get_db_cursor(commit=True) as cursor:
-            cursor.execute("DELETE FROM expenses WHERE expense_date = %s", (expense_date,))
+            cursor.execute(query, (expense_date,))
     except Exception as e:
-        print(f"Error deleting expenses for date {expense_date}: {e}")
-        
+        logger.error(f"Error deleting expenses for date {expense_date}: {e}")
+
 def fetch_expense_summary(start_date, end_date):
-    logger.info(f"fetch_expense_summary called with start: {start_date}, end: {end_date}")
+    """Fetch summary of expenses between two dates."""
+    logger.info(f"Fetching expense summary for {start_date} to {end_date}")
+    query = """
+        SELECT category, SUM(amount) as total
+        FROM expenses
+        WHERE expense_date BETWEEN %s AND %s
+        GROUP BY category
+    """
     try:
         with get_db_cursor() as cursor:
-            cursor.execute('''SELECT category, SUM(amount) as total
-                           FROM expenses WHERE expense_date BETWEEN %s and %s
-                           GROUP BY category''', (start_date, end_date))
-            data = cursor.fetchall()
-            return data
+            cursor.execute(query, (start_date, end_date))
+            return cursor.fetchall()
     except Exception as e:
-        print(f"Error fetching expense summary: {e}")
-        return None
+        logger.error(f"Error fetching expense summary: {e}")
+        return []
+
 
 if __name__ == "__main__":
     # Example function calls:
