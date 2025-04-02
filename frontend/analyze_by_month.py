@@ -29,7 +29,7 @@ def analyze_by_month_tab():
     with col2:
         end_date = st.date_input("End Date", datetime(2024, 12, 31))
 
-    if st.button("Analyze!"):
+    if st.button("Analyze!", key="analyze_by_month"):
         response_data = fetch_monthly_analytics(start_date, end_date)
         if response_data is None:
             return

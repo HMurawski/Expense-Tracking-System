@@ -28,7 +28,7 @@ def analyze_by_category_tab():
     with col2:
         end_date = st.date_input("End Date", datetime(2024, 8, 5))
 
-    if st.button("Analyze!"):
+    if st.button("Analyze!", key="analyze_by_category"):
         response_data = fetch_analytics(start_date, end_date)
         if response_data is None:
             return
